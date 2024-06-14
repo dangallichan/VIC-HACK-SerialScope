@@ -32,7 +32,7 @@ from matplotlib import pyplot as plt
 
 SER_TIMEOUT = 2                   # Timeout for serial Rx
 baudrate    = 115200              # Default baud rate
-portname    = "/dev/ttyACM1"      # Default port name
+portname    = "/dev/ttyACM2"      # Default port name
 MAX_n_data_channels = 12
 
 
@@ -108,7 +108,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._plot_refs = [None] * MAX_n_data_channels
         # self._plot_refs = None
         for iPlot in range(self.n_data_channels):
-                self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.ydata[:,iPlot + int(self.firstChannelIsTime)], color=next(self.color))[0]
+                self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.ydata[-self.n_xpts:,iPlot + int(self.firstChannelIsTime)], color=next(self.color))[0]
                 self.ax1[iPlot].set_ylabel('Channel ' + str(iPlot + 1))
         # self.plotData()
         # self.ax1.set_ylim(0, 50)
@@ -138,9 +138,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def addNewData(self, y):
         # print('received data')
-        #self.ydata = np.vstack((self.ydata,y))
-        self.ydata = np.roll(self.ydata, -1, axis=0)
-        self.ydata[-1,:] = y
+        self.ydata = np.vstack((self.ydata,y))
+        #self.ydata = np.roll(self.ydata, -1, axis=0)
+        #self.ydata[-1,:] = y
+        #print(self.ydata.shape)
 
     def updateGUI(self):
         # obtain value from slider
@@ -162,7 +163,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for iPlot in range(self.n_data_channels):
             #print(self.ydata[:,iPlot])
             # self._plot_refs[iPlot].set_ydata(self.YGlobalScale * self.ydata[:,iPlot] + self.Yoffset*iPlot)
-            self._plot_refs[iPlot].set_ydata(self.ydata[:,iPlot + int(self.firstChannelIsTime)])
+            self._plot_refs[iPlot].set_ydata(self.ydata[-self.n_xpts:,iPlot + int(self.firstChannelIsTime)])
             if np.any(self.ydata[:,iPlot + int(self.firstChannelIsTime)]):
                 self.ax1[iPlot].set_ylim(min(self.ydata[:,iPlot + int(self.firstChannelIsTime)]), max(self.ydata[:,iPlot + int(self.firstChannelIsTime)]))
             else:

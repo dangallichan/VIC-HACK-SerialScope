@@ -41,13 +41,13 @@ def getSerialPort():
     for port in ports :
         print('Find port '+ port.device)
     
-    ser = serial.Serial(port.device)
-    if ser.isOpen():
-        ser.close()
+    # ser = serial.Serial(port.device)
+    # if ser.isOpen():
+    #     ser.close()
     
-    ser = serial.Serial(port.device, 9600, timeout=1)
-    ser.flushInput()
-    ser.flushOutput()
+    # ser = serial.Serial(port.device, 9600, timeout=1)
+    # ser.flushInput()
+    # ser.flushOutput()
     return port.device
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -133,8 +133,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
         # # have somewhere to display the serial data as text
-        #self.serialDataView = SerialDataView(self)
-        #layout.addWidget(self.serialDataView)
+        self.serialDataView = SerialDataView(self)
+        layout.addWidget(self.serialDataView)
         #self.serialDataView.serialData.append("Serial Data:\n")
         #self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
 
@@ -156,9 +156,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def addNewData(self, y):
         # print('received data')
         self.ydata = np.vstack((self.ydata,y))
-        #self.ydata = np.roll(self.ydata, -1, axis=0)
-        #self.ydata[-1,:] = y
-        #print(self.ydata.shape)
 
     def updateGUI(self):
         # obtain value from slider
@@ -167,19 +164,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.YGlobalScale = self.slYGlobalScale.Queuevalue() / self.GlobalScaleFactor
 
     def plotData(self):
-        # Drop off the first y element, append a new one.
-        # self.ydata = np.roll(self.ydata, -1, axis=0)
-        if self.useRandomData:
-            self.ydata[-1,:] = np.random.randint(10, size=(1, self.n_data_channels))
-        else:
-            pass
-            # self.read_data()
-
-       
-        # We have a reference, we can use it to update the data for that line.
+    
+        # update graphed data for each channel
         for iPlot in range(self.n_data_channels):
             #print(self.ydata[:,iPlot])
             # self._plot_refs[iPlot].set_ydata(self.YGlobalScale * self.ydata[:,iPlot] + self.Yoffset*iPlot)
+            if self.firstChannelIsTime:
+                self._plot_refs[iPlot].set_xdata(self.ydata[-self.n_xpts:,0])
+                self.ax1[iPlot].set_xlim(min(self.ydata[-self.n_xpts:,0]), max(self.ydata[-self.n_xpts:,0]))
             self._plot_refs[iPlot].set_ydata(self.ydata[-self.n_xpts:,iPlot + int(self.firstChannelIsTime)])
             if np.any(self.ydata[:,iPlot + int(self.firstChannelIsTime)]):
                 self.ax1[iPlot].set_ylim(min(self.ydata[:,iPlot + int(self.firstChannelIsTime)]), max(self.ydata[:,iPlot + int(self.firstChannelIsTime)]))

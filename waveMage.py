@@ -31,24 +31,26 @@ from matplotlib import pyplot as plt
 
 SER_TIMEOUT = 2                   # Timeout for serial Rx
 baudrate    = 115200              # Default baud rate
-#portname    = "/dev/ttyACM3"      # Default port name
-#portname = "COM12"
 MAX_N_DATA_CHANNELS = 12
 WINDOW_TITLE = "WaveMage v0.1"
+MINWIDTH, MINHEIGHT = 800, 800
 
 def getSerialPort():
     ports = serial.tools.list_ports.comports(include_links=False)
     for port in ports :
         print('Find port '+ port.device)
     
-    # ser = serial.Serial(port.device)
-    # if ser.isOpen():
-    #     ser.close()
-    
-    # ser = serial.Serial(port.device, 9600, timeout=1)
-    # ser.flushInput()
-    # ser.flushOutput()
+    if len(ports) == 0:
+        print('No serial port found')
+        return None
+
     return port.device
+
+    # To manually override the port selection do something like this:
+    # return "COM11"
+    # return "/dev/ttyUSB0"
+    # return "/dev/ttyACM0"
+
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -62,9 +64,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         layout = QtWidgets.QVBoxLayout()
 
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(MINWIDTH, MINHEIGHT)
         
-        self.n_data_channels = 3
+        self.n_data_channels = 6
         self.firstChannelIsTime = True
 
 
@@ -75,19 +77,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.n_xpts = 200
 
-        self.useRandomData = False
-        #if self.useRandomData:
-        #    self.xdata = np.linspace(1, self.n_xpts, self.n_xpts)
-        #    self.ydata = np.random.randint(10, size=(self.n_xpts, self.n_data_channels))
-        #else:
-        # self.xdata = np.zeros((1, 1),dtype=float)
-        # self.ydata = np.zeros((1, self.n_data_channels),dtype=float)
+        # initialize data
         self.xdata = np.linspace(1, self.n_xpts, self.n_xpts)
-        # self.ydata = np.random.randint(10, size=(self.n_xpts, self.n_data_channels))
         self.ydata = np.zeros((self.n_xpts, self.n_data_channels + int(self.firstChannelIsTime)),dtype=float)
 
-
-        self.Yoffset = 0.0
 
         # self.color = iter(plt.cm.rainbow(np.linspace(0, 1, self.n_data_channels)))
         self.color = iter(plt.cm.Set1(np.linspace(0, 1, self.n_data_channels)))
@@ -124,9 +117,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._plot_refs = [None] * MAX_N_DATA_CHANNELS
         for iPlot in range(self.n_data_channels):
                 self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.ydata[-self.n_xpts:,iPlot + int(self.firstChannelIsTime)], color=next(self.color))[0]
-                self.ax1[iPlot].set_ylabel('Channel ' + str(iPlot + 1))
+                self.ax1[iPlot].set_ylabel('Ch ' + str(iPlot + 1))
 
-        self.serth = SerialThread(portname, baudrate)   # Start serial reading thread
+        self.serth = SerialThread(portname, baudrate, self.n_data_channels, self.firstChannelIsTime)   # Start serial reading thread
         self.serth.start()
 
         self.serth.signalDataAsMatrix.connect(self.addNewData)
@@ -135,8 +128,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # # have somewhere to display the serial data as text
         self.serialDataView = SerialDataView(self)
         layout.addWidget(self.serialDataView)
-        #self.serialDataView.serialData.append("Serial Data:\n")
-        #self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
+        self.serialDataView.serialData.append("Serial Data:\n")
+        self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
 
 
         # Setup a timer to trigger the redraw by calling plotData.
@@ -191,9 +184,9 @@ class SerialThread(QtCore.QThread):
     signalDataAsMatrix = QtCore.pyqtSignal(np.ndarray)  # Signal to send data to main thread
     signalDataAsString = QtCore.pyqtSignal(str)        
 
-    def __init__(self, portname, baudrate): # Initialise with serial port details
+    def __init__(self, portname, baudrate, n_data_channels, firstChannelIsTime): # Initialise with serial port details
         QtCore.QThread.__init__(self)
-        self.portname, self.baudrate = portname, baudrate
+        self.portname, self.baudrate, self.n_data_channels, self.firstChannelIsTime = portname, baudrate, n_data_channels, firstChannelIsTime
         self.txq = Queue.Queue()
         self.running = True
 
@@ -216,7 +209,7 @@ class SerialThread(QtCore.QThread):
                 self.signalDataAsString.emit(thisLine)
                 y = np.array([yy.split(",") for yy in thisLine.split()][0],dtype=float)
                 # print(y)                
-                if len(y) == 4:   ## HARD-CODED - NEEDS FIXING!
+                if len(y) == self.n_data_channels + int(self.firstChannelIsTime):  # Check data is correct length
                     self.signalDataAsMatrix.emit(y)
 
             except:
@@ -233,7 +226,7 @@ class SerialDataView(QtWidgets.QWidget):
         self.serialData = QtWidgets.QTextEdit(self)
         self.serialData.setReadOnly(True)
         self.serialData.setFontFamily('Courier New')
-        self.serialData.setMinimumSize(200, 200)
+        self.serialData.setMinimumSize(MINWIDTH, 400)
         # self.serialData.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         
     def appendSerialText(self, appendText):

@@ -6,6 +6,7 @@ Created on Thu Jun 13 15:11:38 2024
 @author: epowell
 """
 import serial
+import serial.tools.list_ports
 import numpy as np
 import sys
 import random
@@ -30,15 +31,32 @@ from matplotlib import pyplot as plt
 
 SER_TIMEOUT = 2                   # Timeout for serial Rx
 baudrate    = 115200              # Default baud rate
-# portname    = "/dev/ttyACM1"      # Default port name
-portname = "COM12"
+#portname    = "/dev/ttyACM3"      # Default port name
+#portname = "COM12"
 MAX_N_DATA_CHANNELS = 12
 WINDOW_TITLE = "WaveMage v0.1"
 
+def getSerialPort():
+    ports = serial.tools.list_ports.comports(include_links=False)
+    for port in ports :
+        print('Find port '+ port.device)
+    
+    ser = serial.Serial(port.device)
+    if ser.isOpen():
+        ser.close()
+    
+    ser = serial.Serial(port.device, 9600, timeout=1)
+    ser.flushInput()
+    ser.flushOutput()
+    return port.device
 
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
+        
+        portname = getSerialPort()
+        print(portname)
+        
         super(MainWindow, self).__init__(*args, **kwargs)
 
 
@@ -115,10 +133,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
         # # have somewhere to display the serial data as text
-        # self.serialDataView = SerialDataView(self)
-        # layout.addWidget(self.serialDataView)
-        # self.serialDataView.serialData.append("Serial Data:\n")
-        # self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
+        #self.serialDataView = SerialDataView(self)
+        #layout.addWidget(self.serialDataView)
+        #self.serialDataView.serialData.append("Serial Data:\n")
+        #self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
 
 
         # Setup a timer to trigger the redraw by calling plotData.
@@ -171,6 +189,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Trigger the canvas to update and redraw.
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
+    
+
         
 
 # Thread to handle incoming & outgoing serial data

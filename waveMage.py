@@ -20,7 +20,7 @@ except:
 
 import numpy as np
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import Qt
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -32,8 +32,10 @@ from matplotlib import pyplot as plt
 
 SER_TIMEOUT = 2                   # Timeout for serial Rx
 baudrate    = 115200              # Default baud rate
-portname    = "/dev/ttyACM1"      # Default port name
-MAX_n_data_channels = 12
+# portname    = "/dev/ttyACM1"      # Default port name
+portname = "COM12"
+MAX_N_DATA_CHANNELS = 12
+WINDOW_TITLE = "WaveMage v0.1"
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -105,21 +107,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
-        self._plot_refs = [None] * MAX_n_data_channels
-        # self._plot_refs = None
+        self._plot_refs = [None] * MAX_N_DATA_CHANNELS
         for iPlot in range(self.n_data_channels):
                 self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.ydata[:,iPlot + int(self.firstChannelIsTime)], color=next(self.color))[0]
                 self.ax1[iPlot].set_ylabel('Channel ' + str(iPlot + 1))
-        # self.plotData()
-        # self.ax1.set_ylim(0, 50)
-
-        # print(self._plot_refs[0])
 
         self.serth = SerialThread(portname, baudrate)   # Start serial reading thread
         self.serth.start()
 
         self.serth.signalDataAsMatrix.connect(self.addNewData)
 
+
+        # have somewhere to display the serial data as text
+        self.serialDataView = SerialDataView(self)
+        layout.addWidget(self.serialDataView)
+        self.serialDataView.serialData.append("Serial Data:\n")
+        self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
 
 
         # Setup a timer to trigger the redraw by calling plotData.
@@ -132,7 +135,7 @@ class MainWindow(QtWidgets.QMainWindow):
         centralWidget = QtWidgets.QWidget()
         centralWidget.setLayout(layout)
         self.setCentralWidget(centralWidget)
-        self.setWindowTitle("WaveMage v0.1")
+        self.setWindowTitle(WINDOW_TITLE)
 
         self.show()
 
@@ -203,14 +206,10 @@ class SerialThread(QtCore.QThread):
                 # print(thisLine)
                 self.signalDataAsString.emit(thisLine)
                 y = np.array([yy.split(",") for yy in thisLine.split()][0],dtype=float)
-                # print(y)
-                
+                # print(y)                
                 if len(y) == 4:   ## HARD-CODED - NEEDS FIXING!
                     self.signalDataAsMatrix.emit(y)
-                    
-                    # if random.random() > 0.9:
-                    #     print(y)    
-                    # print(self.ydata[-1,:])
+
             except:
                 pass
 
@@ -225,12 +224,12 @@ class SerialDataView(QtWidgets.QWidget):
         self.serialData = QtWidgets.QTextEdit(self)
         self.serialData.setReadOnly(True)
         self.serialData.setFontFamily('Courier New')
-        self.serialData.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.serialData.setMinimumSize(200, 200)
+        # self.serialData.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         
-    def appendSerialText(self, appendText, color):
-        self.serialData.moveCursor(Qt.QtGui.QTextCursor.End)
+    def appendSerialText(self, appendText):
+        self.serialData.moveCursor(QtGui.QTextCursor.End)
         self.serialData.setFontFamily('Courier New')
-        self.serialData.setTextColor(color)
         
         self.serialData.insertPlainText(appendText)
         

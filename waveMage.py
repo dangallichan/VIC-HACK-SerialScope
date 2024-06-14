@@ -63,9 +63,16 @@ time.sleep(SER_TIMEOUT*1.2)
 ser.flushInput()
 testLens = np.zeros(10)
 firstVals = np.zeros(10)
+print("Attempting to read 10 lines of data to determine data format...")
 for i in range(10):
-    thisLine = ser.readline().decode("utf-8")
-    newDataRow = np.array([yy.split(",") for yy in thisLine.split()][0],dtype=float)
+    readSuccess = False
+    while not readSuccess:
+        try:
+            thisLine = ser.readline().decode("utf-8")
+            newDataRow = np.array([yy.split(",") for yy in thisLine.split()][0],dtype=float)
+            readSuccess = True
+        except:
+            pass
     print(thisLine + " ****  Nvalues: ", len(newDataRow))
     testLens[i] = len(newDataRow)
     firstVals[i] = newDataRow[0]
@@ -153,14 +160,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.toggleSerialDataViewButton.setMaximumWidth(200)
         layout.addWidget(self.toggleSerialDataViewButton)
         self.toggleSerialDataViewButton.setCheckable(True)
+        self.toggleSerialDataViewButton.setChecked(True)
 
         # have somewhere to display the serial data as text
         # For the streaming rates we are using it seems we can get away with just using a text box and continuously appending to it.
         self.serialDataView = SerialDataView(self)
         layout.addWidget(self.serialDataView)
-        self.serialDataView.serialData.append("Serial Data:\n")
         self.serialThread.signalDataAsString.connect(self.serialDataView.appendSerialText)
         self.toggleSerialDataViewButton.clicked.connect(self.serialDataView.setVisible)
+        self.toggleSerialDataViewButton.clicked.connect(self.serialDataView.setReceiveData)
 
 
         # Setup a timer to trigger the redraw by calling plotData.
@@ -281,11 +289,21 @@ class SerialDataView(QtWidgets.QWidget):
         self.serialData.setReadOnly(True)
         self.serialData.setFontFamily('Courier New')
         self.serialData.setMinimumSize(MINWIDTH, 400)
+        self.receiveData = True
         
     def appendSerialText(self, appendText):
+        if not self.receiveData:
+            return
         self.serialData.moveCursor(QtGui.QTextCursor.End)
         self.serialData.insertPlainText(appendText)
         self.serialData.moveCursor(QtGui.QTextCursor.End)
+
+    def setReceiveData(self, checked):
+        if checked:
+            self.receiveData = True
+        else:
+            self.receiveData = False
+            self.serialData.clear()
 
 app = QtWidgets.QApplication(sys.argv)
 w = MainWindow()

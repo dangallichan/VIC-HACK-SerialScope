@@ -31,8 +31,8 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib import pyplot as plt
 
 SER_TIMEOUT = 2                   # Timeout for serial Rx
-baudrate    = 115200                # Default baud rate
-portname    = "COM13"                # Default port name
+baudrate    = 115200              # Default baud rate
+portname    = "/dev/ttyACM1"      # Default port name
 MAX_n_data_channels = 12
 
 
@@ -110,7 +110,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for iPlot in range(self.n_data_channels):
                 self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.ydata[:,iPlot + int(self.firstChannelIsTime)], color=next(self.color))[0]
                 self.ax1[iPlot].set_ylabel('Channel ' + str(iPlot + 1))
-        # self.updateData()
+        # self.plotData()
         # self.ax1.set_ylim(0, 50)
 
         # print(self._plot_refs[0])
@@ -122,10 +122,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 
-        # Setup a timer to trigger the redraw by calling updateData.
+        # Setup a timer to trigger the redraw by calling plotData.
         self.timer = QtCore.QTimer()
         self.timer.setInterval(50)
-        self.timer.timeout.connect(self.updateData)
+        self.timer.timeout.connect(self.plotData)
         self.timer.start()
 
         # central widget for QMainWindow
@@ -138,7 +138,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def addNewData(self, y):
         # print('received data')
-        # self.ydata = np.vstack((self.ydata,y))
+        #self.ydata = np.vstack((self.ydata,y))
         self.ydata = np.roll(self.ydata, -1, axis=0)
         self.ydata[-1,:] = y
 
@@ -146,9 +146,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # obtain value from slider
         # self.ax1.set_ylim(self.n_data_channels*self.slOffset.value())
         self.Yoffset = self.slYOffset.value()
-        self.YGlobalScale = self.slYGlobalScale.value() / self.GlobalScaleFactor
+        self.YGlobalScale = self.slYGlobalScale.Queuevalue() / self.GlobalScaleFactor
 
-    def updateData(self):
+    def plotData(self):
         # Drop off the first y element, append a new one.
         # self.ydata = np.roll(self.ydata, -1, axis=0)
         if self.useRandomData:

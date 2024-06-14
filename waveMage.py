@@ -13,6 +13,8 @@ import random
 import matplotlib 
 matplotlib.use('QtAgg')
 import time
+from datetime import datetime
+import os
 
 try:
     import Queue
@@ -34,6 +36,9 @@ baudrate    = 115200              # Default baud rate
 MAX_N_DATA_CHANNELS = 12
 WINDOW_TITLE = "WaveMage v0.1"
 MINWIDTH, MINHEIGHT = 800, 800
+MAX_X_DATA_RANGE = 10000
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def getSerialPort():
     ports = serial.tools.list_ports.comports(include_links=False)
@@ -52,6 +57,14 @@ def getSerialPort():
     # return "/dev/ttyACM0"
 
 
+# # Get 10 lines of data at start to check our data stream
+# ser = serial.Serial(getSerialPort(), baudrate, timeout=SER_TIMEOUT)
+# time.sleep(SER_TIMEOUT*1.2)
+# ser.flushInput()
+# for i in range(10):
+#     print(ser.readline().decode("utf-8"))
+# ser.close()
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
@@ -66,7 +79,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setMinimumSize(MINWIDTH, MINHEIGHT)
         
-        self.n_data_channels = 6
+        self.n_data_channels = 3
+        self.xScaleFactor = 1e-6
         self.firstChannelIsTime = True
 
 
@@ -75,7 +89,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plotWidget = FigureCanvas(self.fig)
         layout.addWidget(self.plotWidget)
 
-        self.n_xpts = 200
+        self.n_xpts = 50
 
         # initialize data
         self.xdata = np.linspace(1, self.n_xpts, self.n_xpts)
@@ -86,31 +100,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.color = iter(plt.cm.Set1(np.linspace(0, 1, self.n_data_channels)))
 
         
-        # slider for y-axis offset
-        self.slYOffset = QtWidgets.QSlider(Qt.Horizontal)
-        self.slYOffset.setMinimum(0)
-        self.slYOffset.setMaximum(40)
-        self.slYOffset.setValue(1)
-        self.slYOffset.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self.slYOffset.setTickInterval(1)
+        # slider for x-axis range
+        self.slXDataRange = QtWidgets.QSlider(Qt.Horizontal)
+        self.slXDataRange.setMinimum(5)
+        self.slXDataRange.setMaximum(MAX_X_DATA_RANGE)
+        self.slXDataRange.setValue(MAX_X_DATA_RANGE-50)
+        self.slXDataRange.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self.slXDataRange.setTickInterval(1)
 
-        # slider for y-scaling
-        self.slYGlobalScale = QtWidgets.QSlider(Qt.Horizontal)
-        self.slYGlobalScale.setMinimum(0)
-        self.slYGlobalScale.setMaximum(100)
-        self.slYGlobalScale.setValue(10)
-        self.slYGlobalScale.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self.slYGlobalScale.setTickInterval(1)
-        self.GlobalScaleFactor = 1000.0
-        self.YGlobalScale = self.slYGlobalScale.value() / self.GlobalScaleFactor
-
-        
         # update along with slider movement
-        layout.addWidget(self.slYOffset)
-        self.slYOffset.valueChanged.connect(self.updateGUI)
-
-        layout.addWidget(self.slYGlobalScale)
-        self.slYGlobalScale.valueChanged.connect(self.updateGUI)
+        layout.addWidget(self.slXDataRange)
+        self.slXDataRange.valueChanged.connect(self.updateGUI)
 
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
@@ -124,6 +124,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.serth.signalDataAsMatrix.connect(self.addNewData)
 
+        self.saveButton = QtWidgets.QPushButton("save those numbers", self)
+        layout.addWidget(self.saveButton)
+        self.saveButton.clicked.connect(self.saveData)
 
         # # have somewhere to display the serial data as text
         self.serialDataView = SerialDataView(self)
@@ -134,7 +137,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Setup a timer to trigger the redraw by calling plotData.
         self.timer = QtCore.QTimer()
-        self.timer.setInterval(50)
+        self.timer.setInterval(10)
         self.timer.timeout.connect(self.plotData)
         self.timer.start()
 
@@ -151,10 +154,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ydata = np.vstack((self.ydata,y))
 
     def updateGUI(self):
-        # obtain value from slider
-        # self.ax1.set_ylim(self.n_data_channels*self.slOffset.value())
-        self.Yoffset = self.slYOffset.value()
-        self.YGlobalScale = self.slYGlobalScale.Queuevalue() / self.GlobalScaleFactor
+        self.n_xpts = MAX_X_DATA_RANGE - self.slXDataRange.value()
+        self.n_xpts = max(5, self.n_xpts)
 
     def plotData(self):
     
@@ -163,8 +164,8 @@ class MainWindow(QtWidgets.QMainWindow):
             #print(self.ydata[:,iPlot])
             # self._plot_refs[iPlot].set_ydata(self.YGlobalScale * self.ydata[:,iPlot] + self.Yoffset*iPlot)
             if self.firstChannelIsTime:
-                self._plot_refs[iPlot].set_xdata(self.ydata[-self.n_xpts:,0])
-                self.ax1[iPlot].set_xlim(min(self.ydata[-self.n_xpts:,0]), max(self.ydata[-self.n_xpts:,0]))
+                self._plot_refs[iPlot].set_xdata(self.ydata[-self.n_xpts:,0] * self.xScaleFactor)
+                self.ax1[iPlot].set_xlim(min(self.ydata[-self.n_xpts:,0] * self.xScaleFactor), max(self.ydata[-self.n_xpts:,0] * self.xScaleFactor))
             self._plot_refs[iPlot].set_ydata(self.ydata[-self.n_xpts:,iPlot + int(self.firstChannelIsTime)])
             if np.any(self.ydata[:,iPlot + int(self.firstChannelIsTime)]):
                 self.ax1[iPlot].set_ylim(min(self.ydata[:,iPlot + int(self.firstChannelIsTime)]), max(self.ydata[:,iPlot + int(self.firstChannelIsTime)]))
@@ -174,6 +175,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Trigger the canvas to update and redraw.
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
+
+    def saveData(self):
+       today = datetime.today()
+       timeis = today.strftime("%Y%m%d_%H%M%S")
+       fname = str(timeis)+"_data.csv"
+       np.savetxt(fname, self.ydata, fmt='%1.3f')
+       print("saved")
     
 
         

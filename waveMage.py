@@ -24,8 +24,6 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import Qt
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-
 
 # from matplotlib.figure import Figure
 from matplotlib import pyplot as plt
@@ -76,8 +74,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.color = iter(plt.cm.rainbow(np.linspace(0, 1, self.n_data_channels)))
         self.color = iter(plt.cm.Set1(np.linspace(0, 1, self.n_data_channels)))
 
-        # add toolbar
-        self.addToolBar(Qt.BottomToolBarArea, NavigationToolbar(self.plotWidget, self))
         
         # slider for y-axis offset
         self.slYOffset = QtWidgets.QSlider(Qt.Horizontal)
@@ -118,11 +114,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serth.signalDataAsMatrix.connect(self.addNewData)
 
 
-        # have somewhere to display the serial data as text
-        self.serialDataView = SerialDataView(self)
-        layout.addWidget(self.serialDataView)
-        self.serialDataView.serialData.append("Serial Data:\n")
-        self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
+        # # have somewhere to display the serial data as text
+        # self.serialDataView = SerialDataView(self)
+        # layout.addWidget(self.serialDataView)
+        # self.serialDataView.serialData.append("Serial Data:\n")
+        # self.serth.signalDataAsString.connect(self.serialDataView.appendSerialText)
 
 
         # Setup a timer to trigger the redraw by calling plotData.

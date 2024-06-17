@@ -49,22 +49,33 @@ def getSerialPort():
 
     return port.device
 
-# Attempt to automatically find the serial port
-print("Attempting to find serial port.")
-print("If this fails, you can manually set the port in the script.")
-print("Also note that if you have multiple serial ports connected,")
-print("the default behavior is to use the last one found.")
-PORTNAME = getSerialPort()
 
+## Set parameters manually here to avoid automatic attempts to determine them
+## Use 'None' to allow automatic determination
+N_DATA_CHANNELS = 3
 # To manually override the port selection do something like this:
 # PORTNAME = "COM11"          ## Windows
 # PORTNAME =  "/dev/ttyUSB0"  ## Linux 
 # PORTNAME =  "/dev/ttyACM0"  ## Linux
 # PORTNAME =  "/dev/tty.usbmodem12345"  ## Mac
+PORTNAME = None
+XSCALEFACTOR = None
+FIRST_CHANNEL_IS_TIME = None
+
+# Attempt to automatically find the serial port
+if PORTNAME is None:
+    print("Attempting to find serial port.")
+    print("If this fails, you can manually set the port in the script.")
+    print("Also note that if you have multiple serial ports connected,")
+    print("the default behavior is to use the last one found.")
+    PORTNAME = getSerialPort()
+
+
 
 if PORTNAME is None:
     USE_RANDOM_DATA = True
-    N_DATA_CHANNELS = 12
+    if N_DATA_CHANNELS is None:
+        N_DATA_CHANNELS = 1
     FIRST_CHANNEL_IS_TIME = False
     XSCALEFACTOR = 1
     print("No serial port found, using random data with " + str(N_DATA_CHANNELS) + " channels")
@@ -99,22 +110,30 @@ else:
     avgTimeTaken = (time.time() - timeNow)/9
     print("Average time taken to read a line: ", avgTimeTaken, "s")
     ser.close()
-    N_DATA_CHANNELS = int(np.median(testLens))
+    dataLength = int(np.median(testLens))
     diffFirstVals = np.diff(firstVals)
     meanDiffFirstVals = np.mean(diffFirstVals)
-    XSCALEFACTOR = 1 / (np.round(meanDiffFirstVals / avgTimeTaken / 1000.0) * 1000.0)
+    this_xscale = 1 / (np.round(meanDiffFirstVals / avgTimeTaken / 1000.0) * 1000.0)
     stderrDiffFirstVals = np.abs(np.std(diffFirstVals)/meanDiffFirstVals)
     print("Diff of first values: ", diffFirstVals)
     print("Stderr of diff of first values: ", stderrDiffFirstVals)
     if stderrDiffFirstVals > 0.05:
         print("First values are not consistent, assuming first channel is not time")
-        FIRST_CHANNEL_IS_TIME = False
+        if FIRST_CHANNEL_IS_TIME is None:
+            FIRST_CHANNEL_IS_TIME = False
     else:
         print("First values are consistent, assuming first channel is time")
-        print('Setting xScaleFactor to ', XSCALEFACTOR)
-        FIRST_CHANNEL_IS_TIME = True
-        N_DATA_CHANNELS -= 1
-    print("Number of data channels: ", N_DATA_CHANNELS)
+        print('Setting xScaleFactor to ', this_xscale)
+        if FIRST_CHANNEL_IS_TIME is None:
+            FIRST_CHANNEL_IS_TIME = True    
+        dataLength -= 1
+    print("Number of data channels detected: ", dataLength)
+    if N_DATA_CHANNELS is None:
+        N_DATA_CHANNELS = dataLength
+    if XSCALEFACTOR is None:
+        XSCALEFACTOR = this_xscale
+    
+
 
 # exit() # uncomment to exit after finding serial port for testing
 
@@ -134,15 +153,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
          # create plot and put into layout
         self.fig, self.ax1 = plt.subplots(self.N_DATA_CHANNELS, 1, sharex=True, figsize=(7, 4))
+        thisAx = self.ax1[0] if self.N_DATA_CHANNELS > 1 else self.ax1
         if USE_RANDOM_DATA:
-            self.ax1[0].set_title('Random data (no serial port connection found)')
+            thisAx.set_title('Random data (no serial port connection found)')
         else:
-            self.ax1[0].set_title('Serial data from ' + PORTNAME + ' at ' + str(BAUDRATE) + ' baud')
+            thisAx.set_title('Serial data from ' + PORTNAME + ' at ' + str(BAUDRATE) + ' baud')
 
+        thisAx = self.ax1[-1] if self.N_DATA_CHANNELS > 1 else self.ax1
         if self.FIRST_CHANNEL_IS_TIME:
-            self.ax1[-1].set_xlabel('Time')
+            thisAx.set_xlabel('Time')
         else:
-            self.ax1[-1].set_xlabel('Sample number')
+            thisAx.set_xlabel('Sample number')
                                             
         self.plotWidget = FigureCanvas(self.fig)
 
@@ -172,9 +193,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # create a reference for each channel plot
         self._plot_refs = [None] * self.N_DATA_CHANNELS
-        for iPlot in range(self.N_DATA_CHANNELS):
-                self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.allData[-self.n_xpts:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)], color=next(self.color))[0]
-                self.ax1[iPlot].set_ylabel('Ch ' + str(iPlot + 1))
+        if N_DATA_CHANNELS > 1:
+            for iPlot in range(self.N_DATA_CHANNELS):
+                    self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.allData[-self.n_xpts:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)], color=next(self.color))[0]
+                    self.ax1[iPlot].set_ylabel('Ch ' + str(iPlot + 1))
+        else:
+            self._plot_refs[0] = self.ax1.plot(self.xdata, self.allData[-self.n_xpts:,0], color=next(self.color))[0]
+            self.ax1.set_ylabel('Ch 1') 
 
         self.serialThread = SerialThread(PORTNAME, BAUDRATE, self.N_DATA_CHANNELS, self.FIRST_CHANNEL_IS_TIME)   # Start serial reading thread
         self.serialThread.start()
@@ -252,19 +277,20 @@ class MainWindow(QtWidgets.QMainWindow):
     def plotData(self):
         # update graphed data for each channel
         for iPlot in range(self.N_DATA_CHANNELS):
+            thisAx = self.ax1[iPlot] if self.N_DATA_CHANNELS > 1 else self.ax1
             if self.FIRST_CHANNEL_IS_TIME:
                 self._plot_refs[iPlot].set_xdata(self.allData[-self.n_xpts:,0] * self.xScaleFactor)
-                self.ax1[iPlot].set_xlim(min(self.allData[-self.n_xpts:,0] * self.xScaleFactor), max(self.allData[-self.n_xpts:,0] * self.xScaleFactor))
+                thisAx.set_xlim(min(self.allData[-self.n_xpts:,0] * self.xScaleFactor), max(self.allData[-self.n_xpts:,0] * self.xScaleFactor))
             else:
                 self._plot_refs[iPlot].set_xdata(self.xdata[-self.n_xpts:])
-                self.ax1[iPlot].set_xlim(self.nPtsAcquired-self.n_xpts+1, self.nPtsAcquired)
+                thisAx.set_xlim(self.nPtsAcquired-self.n_xpts+1, self.nPtsAcquired)
             
             self._plot_refs[iPlot].set_ydata(self.allData[-self.n_xpts:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)])
 
             if np.any(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]):
-                self.ax1[iPlot].set_ylim(min(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]), max(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]))
+                thisAx.set_ylim(min(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]), max(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]))
             else:  # handle the case that all data is zero
-                self.ax1[iPlot].set_ylim(-1, 1)
+                thisAx.set_ylim(-1, 1)
 
         # Trigger the canvas to update and redraw.
         self.fig.canvas.draw()

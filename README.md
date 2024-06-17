@@ -21,6 +21,7 @@ Existing packages/sources that we pooled various bits and pieces from:
 * https://github.com/jscastonguay/py-serial-scope/blob/master/pySerialScope.py
 * https://pypi.org/project/SerialScope/
 * https://learn.sparkfun.com/tutorials/graph-sensor-data-with-python-and-matplotlib/introduction
+* https://github.com/xioTechnologies/Serial-Oscilloscope (Windows App)
 
 I also had previously made something with less GUI-ness for MATLAB here:
 https://github.com/dgallichan/matlab-serialScope

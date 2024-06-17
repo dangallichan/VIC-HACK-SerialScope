@@ -1,4 +1,5 @@
 # waveMage
+## Python-based live sensor-data streaming via USB Serial
 <img src="https://github.com/dangallichan/VIC-HACK-SerialScope/assets/71603024/c4c5dec4-909b-493a-914e-b8c793a8df60" width="300">
 
 Our project for the 2024 VIC-HACK - https://github.com/Lewis-Kitchingman/VIC-HACK-2024
@@ -14,6 +15,11 @@ This is what the GUI looks like at the moment:
 
 ### Required packages
 matplotlib, PyQt5, numpy
+
+### Want to stream data from a micro:bit?
+The easiest way is to put this code onto your micro:bit: https://github.com/dgallichan/microbit-simpleserial-trace
+
+Once you understand the basics, here is some starting code that lets you have much more control over the data being sent: https://github.com/dgallichan/microbit-serialSendData
 
 ### Inspiration
 Existing packages/sources that we pooled various bits and pieces from:

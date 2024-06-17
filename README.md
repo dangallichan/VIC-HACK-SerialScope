@@ -16,6 +16,9 @@ This is what the GUI looks like at the moment:
 ### Required packages
 matplotlib, PyQt5, numpy
 
+### Getting started on Windows
+We *think* you should be able to just make sure you have those packages installed and then run waveMage.py as it is - and it should detect a COM device and plot your data. Please do submit an issue or pull-request if you try it out and it doesn't work.
+
 ### Getting started on Linux
 On Windows systems the default COM behaviour is to allow read and write access by default. On Linux, ports are considered owned objects with dedicated (and by default, unpriveleged) permissions. A connected arduino or micro:bit will be assigned an abstract control model (ACM) port. To temporarily change the permissions of an ACM port, you can use the chmod command. This method is straightforward but will only last until the device is reconnected or the system is rebooted. For instance, to give all users read and write access to /dev/ttyACM0, you can run the following command:
 ```

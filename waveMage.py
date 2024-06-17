@@ -52,15 +52,16 @@ def getSerialPort():
 
 ## Set parameters manually here to avoid automatic attempts to determine them
 ## Use 'None' to allow automatic determination
-N_DATA_CHANNELS = 3
+N_DATA_CHANNELS = None
+XSCALEFACTOR = None
+FIRST_CHANNEL_IS_TIME = None
 # To manually override the port selection do something like this:
 # PORTNAME = "COM11"          ## Windows
 # PORTNAME =  "/dev/ttyUSB0"  ## Linux 
 # PORTNAME =  "/dev/ttyACM0"  ## Linux
 # PORTNAME =  "/dev/tty.usbmodem12345"  ## Mac
 PORTNAME = None
-XSCALEFACTOR = None
-FIRST_CHANNEL_IS_TIME = None
+
 
 # Attempt to automatically find the serial port
 if PORTNAME is None:

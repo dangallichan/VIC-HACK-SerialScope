@@ -147,20 +147,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setMinimumSize(MINWIDTH, MINHEIGHT)
         
-        self.N_DATA_CHANNELS = N_DATA_CHANNELS
-        self.xScaleFactor = XSCALEFACTOR # Scale factor for x-axis if first channel is time
-        self.FIRST_CHANNEL_IS_TIME = FIRST_CHANNEL_IS_TIME
-
-         # create plot and put into layout
-        self.fig, self.ax1 = plt.subplots(self.N_DATA_CHANNELS, 1, sharex=True, figsize=(7, 4))
-        thisAx = self.ax1[0] if self.N_DATA_CHANNELS > 1 else self.ax1
+         # create plot widget
+        self.fig, self.ax1 = plt.subplots(N_DATA_CHANNELS, 1, sharex=True, figsize=(7, 4))
+        thisAx = self.ax1[0] if N_DATA_CHANNELS > 1 else self.ax1 # handle the case of a single channel
         if USE_RANDOM_DATA:
             thisAx.set_title('Random data (no serial port connection found)')
         else:
             thisAx.set_title('Serial data from ' + PORTNAME + ' at ' + str(BAUDRATE) + ' baud')
 
-        thisAx = self.ax1[-1] if self.N_DATA_CHANNELS > 1 else self.ax1
-        if self.FIRST_CHANNEL_IS_TIME:
+        thisAx = self.ax1[-1] if N_DATA_CHANNELS > 1 else self.ax1
+        if FIRST_CHANNEL_IS_TIME:
             thisAx.set_xlabel('Time')
         else:
             thisAx.set_xlabel('Sample number')
@@ -173,10 +169,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # initialize data, xdata as integer counter, ydata as zeros
         self.xdata = np.linspace(1, self.n_xpts, self.n_xpts)
-        self.allData = np.zeros((self.n_xpts, self.N_DATA_CHANNELS + int(self.FIRST_CHANNEL_IS_TIME)),dtype=float)
+        self.allData = np.zeros((self.n_xpts, N_DATA_CHANNELS + int(FIRST_CHANNEL_IS_TIME)),dtype=float)
 
         # color iterator for plotting
-        self.color = iter(plt.cm.Set1(np.linspace(0, 1, self.N_DATA_CHANNELS)))
+        self.color = iter(plt.cm.Set1(np.linspace(0, 1, N_DATA_CHANNELS)))
         
         # slider for x-axis range
         self.slXDataRange = QtWidgets.QSlider(Qt.Horizontal)
@@ -192,16 +188,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slXDataRange.valueChanged.connect(self.updateGUI)
 
         # create a reference for each channel plot
-        self._plot_refs = [None] * self.N_DATA_CHANNELS
+        self._plot_refs = [None] * N_DATA_CHANNELS
         if N_DATA_CHANNELS > 1:
-            for iPlot in range(self.N_DATA_CHANNELS):
-                    self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.allData[-self.n_xpts:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)], color=next(self.color))[0]
+            for iPlot in range(N_DATA_CHANNELS):
+                    self._plot_refs[iPlot] = self.ax1[iPlot].plot(self.xdata, self.allData[-self.n_xpts:,iPlot + int(FIRST_CHANNEL_IS_TIME)], color=next(self.color))[0]
                     self.ax1[iPlot].set_ylabel('Ch ' + str(iPlot + 1))
         else:
             self._plot_refs[0] = self.ax1.plot(self.xdata, self.allData[-self.n_xpts:,0], color=next(self.color))[0]
             self.ax1.set_ylabel('Ch 1') 
 
-        self.serialThread = SerialThread(PORTNAME, BAUDRATE, self.N_DATA_CHANNELS, self.FIRST_CHANNEL_IS_TIME)   # Start serial reading thread
+        self.serialThread = SerialThread(PORTNAME, BAUDRATE)   # Start serial reading thread
         self.serialThread.start()
 
         self.serialThread.signalDataAsMatrix.connect(self.addNewData)
@@ -264,7 +260,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.allData[self.nPtsAcquired,:] = newDataRow
         else:
             self.allData = np.vstack((self.allData,newDataRow)) 
-            if not self.FIRST_CHANNEL_IS_TIME:
+            if not FIRST_CHANNEL_IS_TIME:
                 self.xdata = np.linspace(1, self.allData.shape[0], self.allData.shape[0])
 
         self.nPtsAcquired += 1        
@@ -276,19 +272,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def plotData(self):
         # update graphed data for each channel
-        for iPlot in range(self.N_DATA_CHANNELS):
-            thisAx = self.ax1[iPlot] if self.N_DATA_CHANNELS > 1 else self.ax1
-            if self.FIRST_CHANNEL_IS_TIME:
-                self._plot_refs[iPlot].set_xdata(self.allData[-self.n_xpts:,0] * self.xScaleFactor)
-                thisAx.set_xlim(min(self.allData[-self.n_xpts:,0] * self.xScaleFactor), max(self.allData[-self.n_xpts:,0] * self.xScaleFactor))
+        for iPlot in range(N_DATA_CHANNELS):
+            thisAx = self.ax1[iPlot] if N_DATA_CHANNELS > 1 else self.ax1
+            if FIRST_CHANNEL_IS_TIME:
+                self._plot_refs[iPlot].set_xdata(self.allData[-self.n_xpts:,0] * XSCALEFACTOR)
+                xmin, xmax = min(self.allData[-self.n_xpts:,0] * XSCALEFACTOR), max(self.allData[-self.n_xpts:,0] * XSCALEFACTOR)
+                if xmin == xmax: # handle the case that all data is the same
+                    thisAx.set_xlim(xmin-1, xmax+1)
+                else:
+                    thisAx.set_xlim(xmin, xmax)                
             else:
                 self._plot_refs[iPlot].set_xdata(self.xdata[-self.n_xpts:])
                 thisAx.set_xlim(self.nPtsAcquired-self.n_xpts+1, self.nPtsAcquired)
             
-            self._plot_refs[iPlot].set_ydata(self.allData[-self.n_xpts:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)])
+            self._plot_refs[iPlot].set_ydata(self.allData[-self.n_xpts:,iPlot + int(FIRST_CHANNEL_IS_TIME)])
 
-            if np.any(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]):
-                thisAx.set_ylim(min(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]), max(self.allData[:,iPlot + int(self.FIRST_CHANNEL_IS_TIME)]))
+            if np.any(self.allData[:,iPlot + int(FIRST_CHANNEL_IS_TIME)]):
+                thisAx.set_ylim(min(self.allData[:,iPlot + int(FIRST_CHANNEL_IS_TIME)]), max(self.allData[:,iPlot + int(FIRST_CHANNEL_IS_TIME)]))
             else:  # handle the case that all data is zero
                 thisAx.set_ylim(-1, 1)
 
@@ -313,12 +313,12 @@ class SerialThread(QtCore.QThread):
     signalDataAsMatrix = QtCore.pyqtSignal(np.ndarray)  # Signal to send data to main thread
     signalDataAsString = QtCore.pyqtSignal(str)         # Signal to send data to main thread as string
 
-    def __init__(self, PORTNAME, BAUDRATE, N_DATA_CHANNELS, FIRST_CHANNEL_IS_TIME): # Initialise with serial port details
+    def __init__(self, PORTNAME, BAUDRATE): # Initialise with serial port details
         QtCore.QThread.__init__(self)
         if USE_RANDOM_DATA:
-            self.PORTNAME, self.BAUDRATE, self.N_DATA_CHANNELS, self.FIRST_CHANNEL_IS_TIME = None, None, N_DATA_CHANNELS, FIRST_CHANNEL_IS_TIME            
+            self.PORTNAME, self.BAUDRATE = None, None 
         else:
-            self.PORTNAME, self.BAUDRATE, self.N_DATA_CHANNELS, self.FIRST_CHANNEL_IS_TIME = PORTNAME, BAUDRATE, N_DATA_CHANNELS, FIRST_CHANNEL_IS_TIME
+            self.PORTNAME, self.BAUDRATE = PORTNAME, BAUDRATE
         # self.txq = Queue.Queue()
         self.running = True
 
@@ -342,7 +342,7 @@ class SerialThread(QtCore.QThread):
         while self.running:
 
             if USE_RANDOM_DATA:
-                newDataRow = np.random.rand(self.N_DATA_CHANNELS)
+                newDataRow = np.random.rand(N_DATA_CHANNELS)
                 thisLine = ",".join([str(x) for x in newDataRow]) + "\n"
                 # print(thisLine)
                 self.signalDataAsString.emit(thisLine)   
@@ -355,7 +355,7 @@ class SerialThread(QtCore.QThread):
                 self.signalDataAsString.emit(thisLine)
                 newDataRow = np.array([yy.split(",") for yy in thisLine.split()][0],dtype=float)
                 # print(newDataRow)                
-                if len(newDataRow) == self.N_DATA_CHANNELS + int(self.FIRST_CHANNEL_IS_TIME):  # Check data is correct length
+                if len(newDataRow) == N_DATA_CHANNELS + int(FIRST_CHANNEL_IS_TIME):  # Check data is correct length
                     self.signalDataAsMatrix.emit(newDataRow)
 
             except:
